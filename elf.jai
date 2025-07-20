@@ -42,6 +42,20 @@ Elf64_Header :: struct {
     section_names_section_index: u16; // shstrndx
 }
 
+program_header_count :: (header: Elf64_Header, first_section: Elf_Section_Header) -> int {
+    if header.program_header_count < 0xffff return header.program_header_count;
+    else return first_section.info;
+}
+
+section_header_count :: (header: Elf64_Header, first_section: Elf_Section_Header) -> int {
+    if header.section_header_count < 0xff00 return header.section_header_count;
+    else return xx first_section.size;
+}
+
+section_names_index :: (header: Elf64_Header, first_section: Elf_Section_Header) -> int {
+    if header.section_names_section_index < 0xff00 return header.section_names_section_index;
+    else return first_section.link;
+}
 
 // From the standard library, we use
 //  Elf_Section_Header

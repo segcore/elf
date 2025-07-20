@@ -1,11 +1,14 @@
 #import "Basic";
 #import "File";
+#import "String";
 
 readelf :: (file: string) -> success: bool {
     print("=== % ===\n", file);
     // TODO: Check if mmap() the file is quicker
     file_data, success := read_entire_file(file);
+    defer free(file_data);
     if !success return false;
+
     if file_data.count < size_of(Elf64_Header) {
         log_error("File too small to contain an ELF header");
         return false;
@@ -33,14 +36,49 @@ readelf :: (file: string) -> success: bool {
         return false;
     }
 
-    sections_raw := cast(*Elf_Section_Header)(file_data.data + elf_header.section_header_offset);
-    sections: []Elf_Section_Header = .{elf_header.section_header_count, sections_raw};
+    sb: String_Builder;
+    strings : [..]string;
 
-    section_names_section := sections[elf_header.section_names_section_index];
-    section_names_table := string.{xx section_names_section.size, file_data.data + section_names_section.offset};
-    for section : sections {
-        name := string_from_table(section_names_table, section.name_offset);
-        print(" -- Section %: %  %\n", formatInt(it_index, minimum_digits=2), right_pad(name, 16), section);
+    sections_raw : *Elf_Section_Header = null;
+    if elf_header.section_header_offset > 0 {
+        sections_raw = cast(*Elf_Section_Header)(file_data.data + elf_header.section_header_offset);
+        sections: []Elf_Section_Header = .{section_header_count(elf_header, sections_raw), sections_raw};
+
+        name_index := section_names_index(elf_header, sections_raw);
+        if name_index >= sections.count {
+            log_error("Section names index is outside of bounds of the sections");
+            return false;
+        }
+
+        section_names_section := sections[name_index];
+        section_names_table := slice(file_data, xx section_names_section.offset, xx section_names_section.size);
+        for section : sections {
+            name := string_from_table(section_names_table, section.name_offset);
+            print(" -- Section %: %  %\n", formatInt(it_index, minimum_digits=2), right_pad(name, 16), section);
+            // If it looks printable, print it
+            data := slice(file_data, xx section.offset, xx section.size);
+            printable := true;
+            begin := 0;
+            strings.count = 0;
+            for data {
+                if it == {
+                    case 0;
+                        str := slice(data, begin, it_index - begin);
+                        array_add(*strings, str);
+                        begin = it_index;
+                    case;
+                    if !is_print(it) {
+                        printable = false;
+                        break;
+                    }
+                }
+            }
+            if printable && strings.count > 0 {
+                escape_begin :: "\e[36m";
+                escape_end :: "\e[0m";
+                print("       %2%1%3\n", strings, escape_begin, escape_end);
+            }
+        }
     }
 
     return true;
