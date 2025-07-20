@@ -42,9 +42,10 @@ Elf64_Header :: struct {
     section_names_section_index: u16; // shstrndx
 }
 
-program_header_count :: (header: Elf64_Header, first_section: Elf_Section_Header) -> int {
+program_header_count :: (header: Elf64_Header, first_section: *Elf_Section_Header) -> int {
     if header.program_header_count < 0xffff return header.program_header_count;
-    else return first_section.info;
+    else if first_section return first_section.info;
+    else return 0;
 }
 
 section_header_count :: (header: Elf64_Header, first_section: Elf_Section_Header) -> int {
@@ -62,32 +63,56 @@ section_names_index :: (header: Elf64_Header, first_section: Elf_Section_Header)
 //  Elf_Symbol
 
 Elf_Program_Header_Type :: enum u32 {
-    NULL :: 0;
-    LOAD :: 1;
+    NULL    :: 0;       /* Program header table entry unused */
+    LOAD    :: 1;       /* Loadable program segment */
+    DYNAMIC :: 2;       /* Dynamic linking information */
+    INTERP  :: 3;       /* Program interpreter */
+    NOTE    :: 4;       /* Auxiliary information */
+    SHLIB   :: 5;       /* Reserved */
+    PHDR    :: 6;       /* Entry for header table itself */
+    TLS     :: 7;       /* Thread-local storage segment */
+    LOOS    :: 0x60000000;          /* Start of OS-specific */
+    GNU_EH_FRAME    :: 0x6474e550;  /* GCC .eh_frame_hdr segment */
+    GNU_STACK       :: 0x6474e551;  /* Indicates stack executability */
+    GNU_RELRO       :: 0x6474e552;  /* Read-only after relocation */
+    GNU_PROPERTY    :: 0x6474e553;  /* GNU property */
 };
 
-Elf_Program_Header_Flag :: enum u32 {
+Elf_Program_Header_Flag :: enum_flags u32 {
     X :: 1;
     W :: 2;
     R :: 4;
 };
 
 Elf_Program_Header :: struct(Offset_Type: Type = u64) {
-    type:   Elf_Program_Header_Type;
-    flags:  Elf_Program_Header_Flag;
-    offset: Offset_Type;
-    vaddr:  Offset_Type;
-    paddr:  Offset_Type;
-    filesz: Offset_Type;
-    memsz:  Offset_Type;
-    align:  Offset_Type;
+    type:   Elf_Program_Header_Type;  /* Segment type */
+    flags:  Elf_Program_Header_Flag;  /* Segment flags */
+    offset: Offset_Type;              /* Segment file offset */
+    vaddr:  Offset_Type;              /* Segment virtual address */
+    paddr:  Offset_Type;              /* Segment physical address */
+    filesz: Offset_Type;              /* Segment size in file */
+    memsz:  Offset_Type;              /* Segment size in memory */
+    align:  Offset_Type;              /* Segment alignment */
 };
+
+Elf64_Relocation :: struct {
+    address:   u64;
+    type:      Elf_Relocation_Type;
+    symbol_id: Elf_Symbol_Id;
+}
+
+Elf64_RelocationA :: struct {
+    using reloc: Elf64_Relocation;
+    addend:    s64;
+}
+
 
 main :: () {
     generate_exe_truefalse("true", true);
     generate_exe_truefalse("false", false);
 
     for arg : get_command_line_arguments() {
+        if it_index == 0 continue;
         readelf(arg);
     }
 }
